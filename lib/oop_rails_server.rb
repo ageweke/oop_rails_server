@@ -1,5 +1,3 @@
 require "oop_rails_server/version"
-
-module OopRailsServer
-  # Your code goes here...
-end
+require "oop_rails_server/rails_server"
+require "oop_rails_server/helpers"
