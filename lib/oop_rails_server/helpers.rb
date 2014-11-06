@@ -23,7 +23,7 @@ module OopRailsServer
 
     def get_success(subpath, options = { })
       data = get(subpath, options)
-      data.should match(/rails_spec_application/i) unless options[:no_layout]
+      data.should match(/oop_rails_server_base_template/i) unless options[:no_layout]
       data
     end
 
@@ -101,6 +101,27 @@ it should return the fully-qualified path to the root of your project (gem, appl
       end
     end
 
+    def oop_rails_server_base_templates
+      [
+        File.expand_path(File.join(File.dirname(__FILE__), '../../templates/oop_rails_server_base'))
+      ]
+    end
+
+    def rails_server_implicit_template_paths
+      [ ]
+    end
+
+    def rails_server_template_paths(template_names)
+      template_names.map do |template_name|
+        template_name = template_name.to_s
+        if template_name =~ %r{^/}
+          template_name
+        else
+          File.join(rails_server_templates_root, template_name)
+        end
+      end
+    end
+
     def start_rails_server!(options = { })
       templates = Array(options[:templates] || options[:name] || [ ])
       raise "You must specify a template" unless templates.length >= 1
@@ -112,11 +133,12 @@ it should return the fully-qualified path to the root of your project (gem, appl
 
       server = rails_servers[name]
       server ||= begin
-        templates = [ 'base' ] + templates unless options[:skip_base_template]
+        templates =
+          oop_rails_server_base_templates +
+          rails_server_implicit_template_paths +
+          templates
 
-        template_paths = templates.map do |t|
-          File.join(rails_server_templates_root, t.to_s)
-        end
+        template_paths = rails_server_template_paths(templates)
 
         additional_gemfile_lines = Array(rails_server_additional_gemfile_lines || [ ])
         additional_gemfile_lines += Array(options[:additional_gemfile_lines] || [ ])
