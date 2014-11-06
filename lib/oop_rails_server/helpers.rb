@@ -23,7 +23,7 @@ module OopRailsServer
 
     def get_success(subpath, options = { })
       data = get(subpath, options)
-      data.should match(/oop_rails_server_base_template/i) unless options[:no_layout]
+      expect(data).to match(/oop_rails_server_base_template/i) unless options[:no_layout]
       data
     end
 
@@ -33,7 +33,7 @@ module OopRailsServer
 
       data = get_success(subpath, options)
       regexes.each do |regex|
-        data.should match(regex)
+        expect(data).to match(regex)
       end
 
       data
@@ -55,9 +55,9 @@ module OopRailsServer
   #{data.inspect}}
       end
 
-      json['exception'].should be
-      json['exception']['class'].should == class_name.to_s
-      json['exception']['message'].should match(message)
+      expect(json['exception']).to be
+      expect(json['exception']['class']).to eq(class_name.to_s)
+      expect(json['exception']['message']).to match(message)
     end
 
     def rails_template_name
