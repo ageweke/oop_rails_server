@@ -78,13 +78,11 @@ it should return the fully-qualified path to the root of your project (gem, appl
     end
 
     def rails_server_additional_gemfile_lines
-      [
-        "gem 'fortitude', :path => '#{rails_server_project_root}'"
-      ]
+      [ ]
     end
 
     def rails_server_default_version
-      ENV['FORTITUDE_SPECS_RAILS_VERSION']
+      nil
     end
 
     def rails_servers
