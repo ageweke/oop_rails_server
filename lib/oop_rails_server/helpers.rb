@@ -89,6 +89,59 @@ it should return the fully-qualified path to the root of your project (gem, appl
       @rails_servers ||= { }
     end
 
+    def mail_sent_to(destination_address, the_rails_server = nil)
+      the_rails_server ||= rails_server
+
+      mail_file = File.join(mail_directory_for_rails_server(the_rails_server), destination_address)
+
+      if File.exist?(mail_file)
+        contents = File.read(mail_file).split(/\n/)
+        headers = { }
+        last_header = nil
+        body = ""
+        have_started_body = false
+
+        contents.each do |line|
+          if have_started_body
+            body << "#{line.chomp}\n"
+          elsif line.strip.length == 0
+            have_started_body = true
+          elsif line =~ /^(\S+):\s+(.*?)\s*$/i
+            last_header = $1
+            headers[last_header] = $2
+          elsif line =~ /^\s+(.*?)\s*$/i && last_header
+            headers[last_header] << " #{$1}"
+          else
+            raise "Unexpected line in #{mail_file.inspect}:\n#{line}"
+          end
+        end
+
+        { :headers => headers, :body => body }
+      else
+        if File.exist?(mail_directory_for_rails_server(the_rails_server))
+          $stderr.puts "WARNING: No mails for #{destination_address.inspect}: #{Dir.entries(mail_directory_for_rails_server(the_rails_server))}"
+        else
+          $stderr.puts "WARNING: No mails: no dir: #{mail_directory_for_rails_server(the_rails_server)}"
+        end
+      end
+    end
+
+    def clear_mails!(the_rails_server = nil)
+      the_rails_server ||= rails_server
+
+      mail_directory = mail_directory_for_rails_server(the_rails_server)
+      entries = Dir.entries(mail_directory).select do |entry|
+        entry !~ /^\./ && entry =~ /^\S.*@/
+      end
+
+      entries.each { |e| File.delete(File.join(mail_directory, e)) }
+    end
+
+    def mail_directory_for_rails_server(the_rails_server = nil)
+      the_rails_server ||= rails_server
+      File.join(the_rails_server.rails_root, 'tmp', 'mails')
+    end
+
     def rails_server
       if rails_servers.size == 1
         rails_servers[rails_servers.keys.first]

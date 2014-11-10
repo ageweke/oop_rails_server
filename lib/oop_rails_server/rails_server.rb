@@ -27,7 +27,7 @@ module OopRailsServer
       @additional_gemfile_lines = Array(options[:additional_gemfile_lines] || [ ])
 
 
-      @rails_root = File.join(@runtime_base_directory, rails_version.to_s, name.to_s)
+      @rails_root = File.expand_path(File.join(@runtime_base_directory, rails_version.to_s, name.to_s))
       @port = 20_000 + rand(10_000)
       @server_pid = nil
     end
