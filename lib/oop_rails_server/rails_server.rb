@@ -41,7 +41,8 @@ module OopRailsServer
     end
 
     def get(path, options = { })
-      get_response(path, options).body.strip
+      out = get_response(path, options)
+      out.body.strip if out
     end
 
     def uri_for(path)
@@ -52,10 +53,27 @@ module OopRailsServer
     def get_response(path, options = { })
       uri = uri_for(path)
       data = Net::HTTP.get_response(uri)
-      unless data.code.to_s == '200' || options[:ignore_status_code]
-        raise "'#{uri}' returned #{data.code.inspect}, not 200; body was: #{data.body.strip}"
+
+      if (data.code.to_s != '200')
+        if options[:ignore_status_code]
+          # ok, nothing
+        elsif options[:nil_on_not_found]
+          data = nil
+        else
+          raise "'#{uri}' returned #{data.code.inspect}, not 200; body was: #{data.body.strip}"
+        end
       end
       data
+    end
+
+    def run_command_in_rails_root!(command)
+      Bundler.with_clean_env do
+        with_rails_env do
+          in_rails_root do
+            safe_system("bundle exec #{command}")
+          end
+        end
+      end
     end
 
     private
@@ -329,7 +347,8 @@ and output:
     end
 
     def is_remote_flag_required_error?(command_failed_error)
-      command_failed_error.output =~ /could\s+not\s+find.*in\s+the\s+gems\s+available\s+on\s+this\s+machine/i
+      command_failed_error.output =~ /could\s+not\s+find.*in\s+the\s+gems\s+available\s+on\s+this\s+machine/i ||
+        command_failed_error.output =~ /could\s+not\s+find.*in\s+any\s+of\s+the\s+sources/i
     end
 
     def do_bundle_install!(name, allow_remote)
