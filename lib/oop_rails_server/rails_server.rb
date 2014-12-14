@@ -212,7 +212,7 @@ EOS
 
     def start_server!
       output = File.join(rails_root, 'log', 'rails-server.out')
-      cmd = "rails server -p #{port} > '#{output}'"
+      cmd = "rails server -p #{port} > '#{output}' 2>&1"
       safe_system(cmd, "starting 'rails server' on port #{port}", :background => true)
 
       server_pid_file = File.join(rails_root, 'tmp', 'pids', 'server.pid')
