@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.7, 21 January 2015
+
+* Further fixes for the `i18n` gem version `0.7.0`.
+
 ## 0.0.6, 21 January 2015
 
 * Fix to compensate for the `i18n` gem, which released a version `0.7.0` that is incompatible with

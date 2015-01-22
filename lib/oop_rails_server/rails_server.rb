@@ -161,7 +161,13 @@ EOS
       # Since Rails 3.0.20 was released, a new version of the I18n gem, 0.5.2, was released that moves a constant
       # into a different namespace. (See https://github.com/mislav/will_paginate/issues/347 for more details.)
       # So, if we're running Rails 3.0.x, we lock the 'i18n' gem to an earlier version.
-      gemfile_contents << "\ngem 'i18n', '= 0.5.0'\n" if rails_version && rails_version =~ /^3\.0\./
+      if rails_version && rails_version =~ /^3\.0\./
+        gemfile_contents << "\ngem 'i18n', '= 0.5.0'\n"
+      elsif RUBY_VERSION =~ /^1\.8\./
+        # Since Rails 3.x was released, a new version of the I18n gem, 0.7.0, was released that is incompatible
+        # with Ruby 1.8.7. So, if we're running with Ruby 1.8.7, we lock the 'i18n' gem to an earlier version.
+        gemfile_contents << "\ngem 'i18n', '< 0.7.0'\n"
+      end
 
       # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
       # new-style hash syntax. As a result, we pin the version backwards in this one specific case.
