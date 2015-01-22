@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.6, 21 January 2015
+
+* Fix to compensate for the `i18n` gem, which released a version `0.7.0` that is incompatible with
+  Ruby 1.8.7.
+
 ## 0.0.5, 14 December 2014
 
 * Added `json` as a dependency, since, under Ruby 1.8.7, it is not necessarily installed otherwise.

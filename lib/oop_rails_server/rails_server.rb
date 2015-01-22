@@ -139,6 +139,8 @@ source 'https://rubygems.org'
 
 gem 'rails'#{rails_version_spec}
 EOS
+
+        f.puts "gem 'i18n', '< 0.7.0'" if RUBY_VERSION =~ /^1\.8\./
       end
 
       run_bundle_install!(:bootstrap)
@@ -251,16 +253,17 @@ EOS
       end
       result = data.body.strip
 
-      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)$/
+      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)\n+Ruby\s+version\s*:\s*(\d+\..*?)\s*$/
         raise "'#{server_verify_url}' returned: #{result.inspect}"
       end
       actual_version = $1
+      ruby_version = $2
 
       if rails_version != :default && (actual_version != rails_version)
         raise "We seem to have spawned the wrong version of Rails; wanted: #{rails_version.inspect} but got: #{actual_version.inspect}"
       end
 
-      say "Successfully spawned a server running Rails #{actual_version} on port #{port}."
+      say "Successfully spawned a server running Rails #{actual_version} (Ruby #{ruby_version}) on port #{port}."
     end
 
     def is_alive?(pid)
