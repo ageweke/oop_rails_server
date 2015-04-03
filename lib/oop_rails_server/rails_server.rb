@@ -2,27 +2,33 @@ require 'fileutils'
 require 'find'
 require 'net/http'
 require 'uri'
+require 'file/tail'
 
 module OopRailsServer
   class RailsServer
-    attr_reader :rails_root, :rails_version, :name
+    attr_reader :rails_root, :rails_version, :name, :actual_rails_version, :actual_ruby_version, :actual_ruby_engine
 
     def initialize(options)
       options.assert_valid_keys(
         :name, :template_paths, :runtime_base_directory,
-        :rails_version, :rails_env, :additional_gemfile_lines
+        :rails_version, :rails_env, :additional_gemfile_lines,
+        :log, :verbose
       )
 
       @name = options[:name] || raise(ArgumentError, "You must specify a name for the Rails server")
 
       @template_paths = options[:template_paths] || raise(ArgumentError, "You must specify one or more template paths")
       @template_paths = Array(@template_paths).map { |t| File.expand_path(t) }
+      @template_paths = base_template_directories + @template_paths
 
       @runtime_base_directory = options[:runtime_base_directory] || raise(ArgumentError, "You must specify a runtime_base_directory")
       @runtime_base_directory = File.expand_path(@runtime_base_directory)
 
       @rails_version = options[:rails_version] || :default
       @rails_env = (options[:rails_env] || 'production').to_s
+
+      @log = options[:log] || $stderr
+      @verbose = options.fetch(:verbose, true)
 
       @additional_gemfile_lines = Array(options[:additional_gemfile_lines] || [ ])
 
@@ -36,22 +42,61 @@ module OopRailsServer
       do_start! unless server_pid
     end
 
+    def setup!
+      @set_up ||= begin
+        Bundler.with_clean_env do
+          with_rails_env do
+            setup_directories!
+
+            in_rails_root_parent do
+              splat_bootstrap_gemfile!
+              rails_new!
+              update_gemfile!
+            end
+
+            in_rails_root do
+              run_bundle_install!(:primary)
+              splat_template_files!
+            end
+          end
+        end
+
+        true
+      end
+    end
+
     def stop!
       stop_server! if server_pid
     end
 
-    def get(path, options = { })
-      out = get_response(path, options)
+    def get(path_or_uri, options = { })
+      out = get_response(path_or_uri, options)
       out.body.strip if out
     end
 
-    def uri_for(path)
-      uri_string = "http://localhost:#{@port}/#{path}"
-      URI.parse(uri_string)
+    def uri_for(path_or_uri, query_values = nil)
+      query_values ||= { }
+
+      if path_or_uri.kind_of?(::URI)
+        path_or_uri
+      else
+        uri_string = "http://#{localhost_name}:#{@port}/#{path_or_uri}"
+        if query_values.length > 0
+          uri_string += ("?" + query_values.map { |k,v| "#{CGI.escape(k.to_s)}=#{CGI.escape(v.to_s)}" }.join("&"))
+        end
+        URI.parse(uri_string)
+      end
     end
 
-    def get_response(path, options = { })
-      uri = uri_for(path)
+    def localhost_name
+      "127.0.0.1"
+    end
+
+    def get_response(path_or_uri, options = { })
+      options.assert_valid_keys(:ignore_status_code, :nil_on_not_found, :query, :no_layout)
+
+      uri = uri_for(path_or_uri, options[:query])
+      # say "[fetch '#{uri}']"
       data = Net::HTTP.get_response(uri)
 
       if (data.code.to_s != '200')
@@ -79,22 +124,20 @@ module OopRailsServer
     private
     attr_reader :template_paths, :runtime_base_directory, :rails_env, :additional_gemfile_lines, :port, :server_pid
 
+    def base_template_directories
+      [
+        File.expand_path(File.join(File.dirname(__FILE__), '../../templates/oop_rails_server_base'))
+      ]
+    end
+
     def do_start!
+      setup!
+
       Bundler.with_clean_env do
         with_rails_env do
-          setup_directories!
-
-          in_rails_root_parent do
-            splat_bootstrap_gemfile!
-            rails_new!
-            update_gemfile!
-          end
-
           in_rails_root do
-            run_bundle_install!(:primary)
-            splat_template_files!
             start_server!
-            verify_server!
+            verify_server_and_shut_down_if_fails!
           end
         end
       end
@@ -174,6 +217,7 @@ EOS
       gemfile_contents << "\ngem 'execjs', '~> 2.0.0'\n" if RUBY_VERSION =~ /^1\.8\./
 
       gemfile_contents << additional_gemfile_lines.join("\n")
+      gemfile_contents << "\n"
 
       File.open(gemfile, 'w') { |f| f << gemfile_contents }
     end
@@ -218,8 +262,12 @@ EOS
       end
     end
 
+    def server_output_file
+      @server_output_file ||= File.join(rails_root, 'log', 'rails-server.out')
+    end
+
     def start_server!
-      output = File.join(rails_root, 'log', 'rails-server.out')
+      output = server_output_file
       cmd = "rails server -p #{port} > '#{output}' 2>&1"
       safe_system(cmd, "starting 'rails server' on port #{port}", :background => true)
 
@@ -238,8 +286,58 @@ EOS
       end
     end
 
+    def verify_server_and_shut_down_if_fails!
+      begin
+        verify_server!
+      rescue Exception => e
+        begin
+          stop_server!
+        rescue Exception => e
+          say "WARNING: Verification of server failed, so we tried to stop it, but we couldn't do that. Proceeding, but you may have a Rails server left around anyway..."
+        end
+
+        raise
+      end
+    end
+
+    class FailedStartupError < StandardError
+      attr_reader :timeout, :verify_exception, :server_logfile, :last_lines
+
+      def initialize(timeout, verify_exception, server_logfile, last_lines)
+        message = %{The out-of-process Rails server failed to start up properly and start responding to requests,
+even after #{timeout.round} seconds. This typically means you've added code that prevents it from
+even starting up -- most likely, a syntax error in a class or other error that stops it
+dead in its tracks. (oop_rails_server starts up Rails servers in the production environment
+by default, and, in production, Rails eagerly loads all classes at startup time.)}
+
+        if server_logfile
+          message << %{
+
+Any errors will be located in the stdout/stderr of the Rails process, which is at:
+  '#{server_logfile}'}
+        end
+
+        if last_lines
+          message << %{
+
+The last #{last_lines.length} lines of this log are:
+
+#{last_lines.join("\n")}}
+        end
+
+        super(message)
+
+        @timeout = timeout
+        @verify_exception = verify_exception
+        @server_logfile = server_logfile
+        @last_lines = last_lines
+      end
+    end
+
+    SERVER_VERIFY_TIMEOUT = 5
+
     def verify_server!
-      server_verify_url = "http://localhost:#{port}/working/rails_is_working"
+      server_verify_url = "http://#{localhost_name}:#{port}/working/rails_is_working"
       uri = URI.parse(server_verify_url)
 
       data = nil
@@ -247,8 +345,24 @@ EOS
       while (! data)
         begin
           data = Net::HTTP.get_response(uri)
-        rescue Errno::ECONNREFUSED, EOFError
-          raise if Time.now > (start_time + 20)
+        rescue Errno::ECONNREFUSED, EOFError => e
+          if Time.now > (start_time + SERVER_VERIFY_TIMEOUT)
+            last_lines = server_logfile = nil
+            if File.exist?(server_output_file) && File.readable?(server_output_file)
+              server_logfile = server_output_file
+              File::Tail::Logfile.open(server_output_file, :break_if_eof => true) do |f|
+                f.extend(File::Tail)
+                last_lines ||= [ ]
+                begin
+                  f.tail(100) { |l| last_lines << l }
+                rescue File::Tail::BreakException
+                  # ok
+                end
+              end
+            end
+
+            raise FailedStartupError.new(Time.now - start_time, e, server_logfile, last_lines)
+          end
           # keep waiting
           sleep 0.1
         end
@@ -259,17 +373,22 @@ EOS
       end
       result = data.body.strip
 
-      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)\n+Ruby\s+version\s*:\s*(\d+\..*?)\s*$/
+      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)\s*\n+\s*Ruby\s+version\s*:\s*(\d+\..*?)\s*\n+\s*Ruby\s+engine:\s*(.*?)\s*\n?$/mi
         raise "'#{server_verify_url}' returned: #{result.inspect}"
       end
       actual_version = $1
       ruby_version = $2
+      ruby_engine = $3
 
       if rails_version != :default && (actual_version != rails_version)
         raise "We seem to have spawned the wrong version of Rails; wanted: #{rails_version.inspect} but got: #{actual_version.inspect}"
       end
 
-      say "Successfully spawned a server running Rails #{actual_version} (Ruby #{ruby_version}) on port #{port}."
+      @actual_rails_version = actual_version
+      @actual_ruby_version = ruby_version
+      @actual_ruby_engine = ruby_engine
+
+      say "Successfully spawned a server running Rails #{actual_version} (Ruby #{ruby_version}, engine #{ruby_engine.inspect}) on port #{port}."
     end
 
     def is_alive?(pid)
@@ -379,12 +498,14 @@ and output:
     end
 
     def say(s, newline = true)
-      if newline
-        $stdout.puts s
-      else
-        $stdout << s
+      if @verbose
+        if newline
+          @log.puts s
+        else
+          @log << s
+        end
+        @log.flush
       end
-      $stdout.flush
     end
 
     def safe_system(cmd, notice = nil, options = { })

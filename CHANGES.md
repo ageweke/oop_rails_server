@@ -1,5 +1,16 @@
 # `oop_rails_server` Releases
 
+## 0.0.8, 3 April 2015
+
+* Much better error reporting if the server fails to start up.
+* Add `OopRailsServer::RailsServer#setup!`, which configures everything properly but does not actually start
+  the out-of-process Rails server yet.
+* Allow passing paths or full URIs into `OopRailsServer::RailsServer#get`, as well as passing a separate Hash
+  of query values.
+* Move question of which templates to use out of `OopRailsServer::Helpers` and into `OopRailsServer::RailsServer`.
+* Save away the actual exact versions of Rails and Ruby being used, as well as the `RUBY_ENGINE`, and allow callers
+  to access them easily.
+
 ## 0.0.7, 21 January 2015
 
 * Further fixes for the `i18n` gem version `0.7.0`.

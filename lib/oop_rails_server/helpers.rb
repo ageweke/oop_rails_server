@@ -152,12 +152,6 @@ it should return the fully-qualified path to the root of your project (gem, appl
       end
     end
 
-    def oop_rails_server_base_templates
-      [
-        File.expand_path(File.join(File.dirname(__FILE__), '../../templates/oop_rails_server_base'))
-      ]
-    end
-
     def rails_server_implicit_template_paths
       [ ]
     end
@@ -185,7 +179,6 @@ it should return the fully-qualified path to the root of your project (gem, appl
       server = rails_servers[name]
       server ||= begin
         templates =
-          oop_rails_server_base_templates +
           rails_server_implicit_template_paths +
           templates
 
