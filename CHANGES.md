@@ -3,6 +3,8 @@
 ## 0.0.9,
 
 * Fix issue with Ruby 1.8.x caused by trying to reference RUBY_ENGINE, which isn't defined in 1.8.x.
+* Tweak regexp we use to detect "need remote access" error on "bundle install --local", since it apparently
+  changed with a recent release of Bundler.
 
 ## 0.0.8, 3 April 2015
 

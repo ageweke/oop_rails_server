@@ -476,7 +476,7 @@ and output:
 
     def is_remote_flag_required_error?(command_failed_error)
       command_failed_error.output =~ /could\s+not\s+find.*in\s+the\s+gems\s+available\s+on\s+this\s+machine/i ||
-        command_failed_error.output =~ /could\s+not\s+find.*in\s+any\s+of\s+the\s+sources/i
+        command_failed_error.output =~ /could\s+not\s+find.*in\s+any\s+of\s+the.*\s+sources/i
     end
 
     def do_bundle_install!(name, allow_remote)
