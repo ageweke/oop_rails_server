@@ -1,6 +1,11 @@
 # `oop_rails_server` Releases
 
-## 0.0.9,
+## 0.0.10, 4 October 2015
+
+* Further tweaks to the regexp we use to detect "need remote access" error -- it seems as if JRuby sometimes
+  emits this with a newline in the middle.
+
+## 0.0.9, 4 October 2015
 
 * Fix issue with Ruby 1.8.x caused by trying to reference RUBY_ENGINE, which isn't defined in 1.8.x.
 * Tweak regexp we use to detect "need remote access" error on "bundle install --local", since it apparently
