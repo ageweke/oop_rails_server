@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.9,
+
+* Fix issue with Ruby 1.8.x caused by trying to reference RUBY_ENGINE, which isn't defined in 1.8.x.
+
 ## 0.0.8, 3 April 2015
 
 * Much better error reporting if the server fails to start up.
