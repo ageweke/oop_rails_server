@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.11, 4 October 2015
+
+* Bump up the timeout we use for verifying that the server has started up properly. Travis CI with JRuby sometimes
+  seems to take longer than this.
+
 ## 0.0.10, 4 October 2015
 
 * Further tweaks to the regexp we use to detect "need remote access" error -- it seems as if JRuby sometimes
