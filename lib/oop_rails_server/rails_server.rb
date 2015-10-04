@@ -153,6 +153,23 @@ module OopRailsServer
       end
     end
 
+    def raise_startup_failed_error!(elapsed_time, exception)
+      last_lines = server_logfile = nil
+      if File.exist?(server_output_file) && File.readable?(server_output_file)
+        server_logfile = server_output_file
+        File::Tail::Logfile.open(server_output_file, :break_if_eof => true) do |f|
+          f.extend(File::Tail)
+          last_lines ||= [ ]
+          begin
+            f.tail(100) { |l| last_lines << l }
+          rescue File::Tail::BreakException
+            # ok
+          end
+        end
+      end
+
+      raise FailedStartupError.new(elapsed_time, exception, server_logfile, last_lines)
+    end
 
     def setup_directories!
       return if @directories_setup
@@ -268,7 +285,7 @@ EOS
 
     def start_server!
       output = server_output_file
-      cmd = "rails server -p #{port} > '#{output}' 2>&1"
+      cmd = "bundle exec rails server -p #{port} > '#{output}' 2>&1"
       safe_system(cmd, "starting 'rails server' on port #{port}", :background => true)
 
       server_pid_file = File.join(rails_root, 'tmp', 'pids', 'server.pid')
@@ -301,9 +318,9 @@ EOS
     end
 
     class FailedStartupError < StandardError
-      attr_reader :timeout, :verify_exception, :server_logfile, :last_lines
+      attr_reader :timeout, :verify_exception_or_message, :server_logfile, :last_lines
 
-      def initialize(timeout, verify_exception, server_logfile, last_lines)
+      def initialize(timeout, verify_exception_or_message, server_logfile, last_lines)
         message = %{The out-of-process Rails server failed to start up properly and start responding to requests,
 even after #{timeout.round} seconds. This typically means you've added code that prevents it from
 even starting up -- most likely, a syntax error in a class or other error that stops it
@@ -328,7 +345,7 @@ The last #{last_lines.length} lines of this log are:
         super(message)
 
         @timeout = timeout
-        @verify_exception = verify_exception
+        @verify_exception_or_message = verify_exception_or_message
         @server_logfile = server_logfile
         @last_lines = last_lines
       end
@@ -342,39 +359,28 @@ The last #{last_lines.length} lines of this log are:
 
       data = nil
       start_time = Time.now
-      while (! data)
+      last_exception = nil
+
+      while Time.now < (start_time + SERVER_VERIFY_TIMEOUT)
+        sleep 0.1
         begin
           data = Net::HTTP.get_response(uri)
         rescue Errno::ECONNREFUSED, EOFError => e
-          if Time.now > (start_time + SERVER_VERIFY_TIMEOUT)
-            last_lines = server_logfile = nil
-            if File.exist?(server_output_file) && File.readable?(server_output_file)
-              server_logfile = server_output_file
-              File::Tail::Logfile.open(server_output_file, :break_if_eof => true) do |f|
-                f.extend(File::Tail)
-                last_lines ||= [ ]
-                begin
-                  f.tail(100) { |l| last_lines << l }
-                rescue File::Tail::BreakException
-                  # ok
-                end
-              end
-            end
-
-            raise FailedStartupError.new(Time.now - start_time, e, server_logfile, last_lines)
-          end
-          # keep waiting
-          sleep 0.1
+          last_exception = e
         end
+
+        $stderr.puts "TRYING..."
+        break if data && data.code && data.code.to_s == '200'
       end
 
-      unless data.code.to_s == '200'
-        raise "'#{server_verify_url}' returned #{data.code.inspect}, not 200"
+      unless data && data.code && data.code.to_s == '200'
+        raise_startup_failed_error!(Time.now - start_time, last_exception || "'#{server_verify_url}' returned #{data.code.inspect}, not 200")
       end
+
       result = data.body.strip
 
       unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)\s*\n+\s*Ruby\s+version\s*:\s*(\d+\..*?)\s*\n+\s*Ruby\s+engine:\s*(.*?)\s*\n?$/mi
-        raise "'#{server_verify_url}' returned: #{result.inspect}"
+        raise_startup_failed_error!(Time.now - start_time, "'#{server_verify_url}' returned: #{result.inspect}")
       end
       actual_version = $1
       ruby_version = $2

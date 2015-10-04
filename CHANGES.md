@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.12, 4 October 2015
+
+* Much better error output if the Rails server fails to start up, and willingness to keep trying if it returns an
+  error 500 instead of 200 -- occasionally this can happen immediately after startup, on some platforms.
+
 ## 0.0.11, 4 October 2015
 
 * Bump up the timeout we use for verifying that the server has started up properly. Travis CI with JRuby sometimes
