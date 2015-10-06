@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.14, 6 October 2015
+
+* More tweaks to the conditions under which we lock `rack-cache` to an earlier version.
+
 ## 0.0.13, 6 October 2015
 
 * A significantly longer timeout (30 seconds, rather than 15) for starting up the Rails server; some versions of JRuby

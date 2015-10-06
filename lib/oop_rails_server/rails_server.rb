@@ -231,8 +231,9 @@ EOS
       end
 
       # Since Rails 3.1.12 was released, a new version of the rack-cache gem, 1.3.0, was released that requires
-      # Ruby 2.0 or above. So, if we're running Rails 3.1.x, we lock the 'rack-cache' gem to an earlier version.
-      if rails_version && rails_version =~ /^3\.1\./
+      # Ruby 2.0 or above. So, if we're running Rails 3.1.x or 3.2.x on Ruby 1.8.x, we lock the 'rack-cache' gem
+      # to an earlier version.
+      if rails_version && rails_version =~ /^3\.[12]\./ && RUBY_VERSION =~ /^1\./
         gemfile_contents << "\ngem 'rack-cache', '< 1.3.0'\n"
       end
 
