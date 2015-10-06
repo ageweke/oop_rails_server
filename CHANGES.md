@@ -1,5 +1,13 @@
 # `oop_rails_server` Releases
 
+## 0.0.13, 6 October 2015
+
+* A significantly longer timeout (30 seconds, rather than 15) for starting up the Rails server; some versions of JRuby
+  in some environments seem to require this.
+* Much better error messages when the server fails to start up, or fails verification.
+* Added a workaround for the fact that Rails 3.1.x requires `rack-cache`, but a new version (1.3.0) was just released
+  that's incompatible with Ruby < 2.x. We now pin `rack-cache` to `< 1.3.0` when using Rails 3.1.x.
+
 ## 0.0.12, 4 October 2015
 
 * Much better error output if the Rails server fails to start up, and willingness to keep trying if it returns an

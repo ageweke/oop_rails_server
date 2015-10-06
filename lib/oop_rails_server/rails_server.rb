@@ -201,6 +201,7 @@ gem 'rails'#{rails_version_spec}
 EOS
 
         f.puts "gem 'i18n', '< 0.7.0'" if RUBY_VERSION =~ /^1\.8\./
+        f.puts "gem 'rack-cache', '< 1.3.0'" if RUBY_VERSION =~ /^1\./
       end
 
       run_bundle_install!(:bootstrap)
@@ -227,6 +228,12 @@ EOS
         # Since Rails 3.x was released, a new version of the I18n gem, 0.7.0, was released that is incompatible
         # with Ruby 1.8.7. So, if we're running with Ruby 1.8.7, we lock the 'i18n' gem to an earlier version.
         gemfile_contents << "\ngem 'i18n', '< 0.7.0'\n"
+      end
+
+      # Since Rails 3.1.12 was released, a new version of the rack-cache gem, 1.3.0, was released that requires
+      # Ruby 2.0 or above. So, if we're running Rails 3.1.x, we lock the 'rack-cache' gem to an earlier version.
+      if rails_version && rails_version =~ /^3\.1\./
+        gemfile_contents << "\ngem 'rack-cache', '< 1.3.0'\n"
       end
 
       # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
@@ -283,6 +290,8 @@ EOS
       @server_output_file ||= File.join(rails_root, 'log', 'rails-server.out')
     end
 
+    START_SERVER_TIMEOUT = 30
+
     def start_server!
       output = server_output_file
       cmd = "bundle exec rails server -p #{port} > '#{output}' 2>&1"
@@ -291,7 +300,7 @@ EOS
       server_pid_file = File.join(rails_root, 'tmp', 'pids', 'server.pid')
 
       start_time = Time.now
-      while Time.now < start_time + 15
+      while Time.now < start_time + START_SERVER_TIMEOUT
         if File.exist?(server_pid_file)
           server_pid = File.read(server_pid_file).strip
           if server_pid =~ /^(\d{1,10})$/i
@@ -299,7 +308,12 @@ EOS
             break
           end
         end
+
         sleep 0.1
+      end
+
+      unless server_pid
+        raise "Unable to start the Rails server even after #{Time.now - start_time} seconds; there seems to be no file at '#{server_pid_file}', or no PID in that file if it does exist. Help!"
       end
     end
 
@@ -307,10 +321,11 @@ EOS
       begin
         verify_server!
       rescue Exception => e
+        say "Verification of Rails server failed:\n  #{e.message} (#{e.class.name})\n    #{e.backtrace.join("\n    ")}"
         begin
           stop_server!
         rescue Exception => e
-          say "WARNING: Verification of server failed, so we tried to stop it, but we couldn't do that. Proceeding, but you may have a Rails server left around anyway..."
+          say "WARNING: Verification of server failed, so we tried to stop it, but we couldn't do that. Proceeding, but you may have a Rails server left around anyway. The exception from trying to stop the server was:\n  #{e.message} (#{e.class.name})\n    #{e.backtrace.join("\n    ")}"
         end
 
         raise
@@ -365,11 +380,11 @@ The last #{last_lines.length} lines of this log are:
         sleep 0.1
         begin
           data = Net::HTTP.get_response(uri)
+          last_exception = nil
         rescue Errno::ECONNREFUSED, EOFError => e
           last_exception = e
         end
 
-        $stderr.puts "TRYING..."
         break if data && data.code && data.code.to_s == '200'
       end
 
