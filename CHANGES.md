@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.15, 10 February 2016
+
+* Fix a small regular-expression issue preventing `oop_rails_server` from working on a Rails version that had four
+  digits in it (such as the recently-released 4.2.5.1).
+
 ## 0.0.14, 6 October 2015
 
 * More tweaks to the conditions under which we lock `rack-cache` to an earlier version.

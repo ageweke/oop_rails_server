@@ -395,7 +395,7 @@ The last #{last_lines.length} lines of this log are:
 
       result = data.body.strip
 
-      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+)\s*\n+\s*Ruby\s+version\s*:\s*(\d+\..*?)\s*\n+\s*Ruby\s+engine:\s*(.*?)\s*\n?$/mi
+      unless result =~ /^Rails\s+version\s*:\s*(\d+\.\d+\.\d+(\.\d+)?)\s*\n+\s*Ruby\s+version\s*:\s*(\d+\..*?)\s*\n+\s*Ruby\s+engine:\s*(.*?)\s*\n?$/mi
         raise_startup_failed_error!(Time.now - start_time, "'#{server_verify_url}' returned: #{result.inspect}")
       end
       actual_version = $1
