@@ -4,6 +4,9 @@ class ApplicationController < ActionController::Base
   protect_from_forgery :with => :exception
 
   rescue_from Exception do |exception|
+    if exception.respond_to?(:cause) && e = exception.cause
+      exception = e
+    end
     render :json => {
       :exception => {
         :class => exception.class.name,
