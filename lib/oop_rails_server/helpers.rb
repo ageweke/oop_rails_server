@@ -60,6 +60,12 @@ module OopRailsServer
       expect(json['exception']['message']).to match(message)
     end
 
+    def expect_status(subpath, status)
+      data = get_response(subpath, ignore_status_code: true)
+
+      expect(data.code.to_i).to eq(status)
+    end
+
     def rails_template_name
       rails_server.name
     end
