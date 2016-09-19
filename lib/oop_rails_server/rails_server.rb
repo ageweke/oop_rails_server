@@ -202,6 +202,7 @@ EOS
 
         f.puts "gem 'i18n', '< 0.7.0'" if RUBY_VERSION =~ /^1\.8\./
         f.puts "gem 'rack-cache', '< 1.3.0'" if RUBY_VERSION =~ /^1\./
+        f.puts "gem 'rake', '< 11.0.0'" if RUBY_VERSION =~ /^1\.8\./
       end
 
       run_bundle_install!(:bootstrap)
@@ -237,9 +238,17 @@ EOS
         gemfile_contents << "\ngem 'rack-cache', '< 1.3.0'\n"
       end
 
-      # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
-      # new-style hash syntax. As a result, we pin the version backwards in this one specific case.
-      gemfile_contents << "\ngem 'execjs', '~> 2.0.0'\n" if RUBY_VERSION =~ /^1\.8\./
+      if RUBY_VERSION =~ /^1\.8\./
+        # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
+        # new-style hash syntax. As a result, we pin the version backwards in this one specific case.
+        gemfile_contents << "\ngem 'execjs', '~> 2.0.0'\n"
+
+        # Rake 11 is incompatible with Ruby 1.8
+        gemfile_contents << "\ngem 'rake', '< 11.0.0'\n"
+
+        # Uglifier 3 is incompatible with Ruby 1.8
+        gemfile_contents.gsub!(/^(.*['"]uglifier['"].*)$/, "\\1, '< 3.0.0'")
+      end
 
       gemfile_contents << additional_gemfile_lines.join("\n")
       gemfile_contents << "\n"

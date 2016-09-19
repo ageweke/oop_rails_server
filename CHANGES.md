@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.16, 19 September 2016
+
+* Add workarounds for newer versions of `rake` and `uglifier` that cause problems with Ruby 1.8.7.
+
 ## 0.0.15, 10 February 2016
 
 * Fix a small regular-expression issue preventing `oop_rails_server` from working on a Rails version that had four
