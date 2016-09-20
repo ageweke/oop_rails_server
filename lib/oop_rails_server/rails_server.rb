@@ -203,6 +203,9 @@ EOS
         f.puts "gem 'i18n', '< 0.7.0'" if RUBY_VERSION =~ /^1\.8\./
         f.puts "gem 'rack-cache', '< 1.3.0'" if RUBY_VERSION =~ /^1\./
         f.puts "gem 'rake', '< 11.0.0'" if RUBY_VERSION =~ /^1\.8\./
+
+        # mime-types 3.x depends on mime-types-data, which is incompatible with Ruby < 1.x
+        f.puts "gem 'mime-types', '< 3.0.0'" if RUBY_VERSION =~ /^1\./
       end
 
       run_bundle_install!(:bootstrap)

@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.17, 19 September 2016
+
+* Add workaround for the fact that `mime-types` 3.x depends on `mime-types-data`, which is incompatible with
+  Ruby 1.x.
+
 ## 0.0.16, 19 September 2016
 
 * Add workarounds for newer versions of `rake` and `uglifier` that cause problems with Ruby 1.8.7.
