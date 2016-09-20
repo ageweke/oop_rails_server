@@ -253,6 +253,11 @@ EOS
         gemfile_contents.gsub!(/^(.*['"]uglifier['"].*)$/, "\\1, '< 3.0.0'")
       end
 
+      if RUBY_VERSION =~ /^1\./
+        # mime-types 3.x depends on mime-types-data, which is incompatible with Ruby < 1.x
+        gemfile_contents << "\ngem 'mime-types', '< 3.0.0'\n"
+      end
+
       gemfile_contents << additional_gemfile_lines.join("\n")
       gemfile_contents << "\n"
 

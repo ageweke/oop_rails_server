@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.18, 20 September 2016
+
+* Replicate the workaround for `mime-types` into not just the Rails bootstrap Gemfile, but the Rails gemfile, too.
+
 ## 0.0.17, 19 September 2016
 
 * Add workaround for the fact that `mime-types` 3.x depends on `mime-types-data`, which is incompatible with
