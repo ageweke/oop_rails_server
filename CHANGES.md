@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.19, 20 September 2016
+
+* Significant internal refactor to how Gemfiles get modified that's much more reliable; changes
+  `:additional_gemfile_lines` into `:gemfile_modifier`, and from an array of `String`s to a `Proc`.
+
 ## 0.0.18, 20 September 2016
 
 * Replicate the workaround for `mime-types` into not just the Rails bootstrap Gemfile, but the Rails gemfile, too.

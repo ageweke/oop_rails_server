@@ -77,8 +77,8 @@ it should return the fully-qualified path to the root of your project (gem, appl
       @rails_server_runtime_base_directory ||= File.join(rails_server_project_root, "tmp/spec/rails")
     end
 
-    def rails_server_additional_gemfile_lines
-      [ ]
+    def rails_server_gemfile_modifier
+      Proc.new { |gemfile| }
     end
 
     def rails_server_default_version
@@ -184,14 +184,19 @@ it should return the fully-qualified path to the root of your project (gem, appl
 
         template_paths = rails_server_template_paths(templates)
 
-        additional_gemfile_lines = Array(rails_server_additional_gemfile_lines || [ ])
-        additional_gemfile_lines += Array(options[:additional_gemfile_lines] || [ ])
+        rsgm = rails_server_gemfile_modifier
+        agm = options[:additional_gemfile_modifier] || (Proc.new { |gemfile| })
+
+        gemfile_modifier = Proc.new do |gemfile|
+          rsgm.call(gemfile)
+          agm.call(gemfile)
+        end
 
         server = ::OopRailsServer::RailsServer.new(
           :name => name, :template_paths => template_paths,
           :runtime_base_directory => rails_server_runtime_base_directory,
           :rails_version => (options[:rails_version] || rails_server_default_version),
-          :rails_env => options[:rails_env], :additional_gemfile_lines => additional_gemfile_lines)
+          :rails_env => options[:rails_env], :gemfile_modifier => gemfile_modifier)
 
         rails_servers[name] = server
 

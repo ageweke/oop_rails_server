@@ -3,6 +3,7 @@ require 'find'
 require 'net/http'
 require 'uri'
 require 'file/tail'
+require 'oop_rails_server/gemfile'
 
 module OopRailsServer
   class RailsServer
@@ -11,7 +12,7 @@ module OopRailsServer
     def initialize(options)
       options.assert_valid_keys(
         :name, :template_paths, :runtime_base_directory,
-        :rails_version, :rails_env, :additional_gemfile_lines,
+        :rails_version, :rails_env, :gemfile_modifier,
         :log, :verbose
       )
 
@@ -30,7 +31,7 @@ module OopRailsServer
       @log = options[:log] || $stderr
       @verbose = options.fetch(:verbose, true)
 
-      @additional_gemfile_lines = Array(options[:additional_gemfile_lines] || [ ])
+      @gemfile_modifier = options[:gemfile_modifier] || (Proc.new { |gemfile| })
 
 
       @rails_root = File.expand_path(File.join(@runtime_base_directory, rails_version.to_s, name.to_s))
@@ -122,7 +123,7 @@ module OopRailsServer
     end
 
     private
-    attr_reader :template_paths, :runtime_base_directory, :rails_env, :additional_gemfile_lines, :port, :server_pid
+    attr_reader :template_paths, :runtime_base_directory, :rails_env, :gemfile_modifier, :port, :server_pid
 
     def base_template_directories
       [
@@ -192,22 +193,14 @@ module OopRailsServer
     end
 
     def splat_bootstrap_gemfile!
-      File.open("Gemfile", "w") do |f|
-        rails_version_spec = if rails_version == :default then "" else ", \"= #{rails_version}\"" end
-        f << <<-EOS
-source 'https://rubygems.org'
+      rails_version_specs = if rails_version == :default then [ ] else [ "= #{rails_version}" ] end
 
-gem 'rails'#{rails_version_spec}
-EOS
+      gemfile = ::OopRailsServer::Gemfile.new("Gemfile")
+      gemfile.add_version_constraints!("rails", *rails_version_specs)
 
-        f.puts "gem 'i18n', '< 0.7.0'" if RUBY_VERSION =~ /^1\.8\./
-        f.puts "gem 'rack-cache', '< 1.3.0'" if RUBY_VERSION =~ /^1\./
-        f.puts "gem 'rake', '< 11.0.0'" if RUBY_VERSION =~ /^1\.8\./
+      backcompat_bootstrap_gems!(gemfile)
 
-        # mime-types 3.x depends on mime-types-data, which is incompatible with Ruby < 1.x
-        f.puts "gem 'mime-types', '< 3.0.0'" if RUBY_VERSION =~ /^1\./
-      end
-
+      gemfile.write!
       run_bundle_install!(:bootstrap)
     end
 
@@ -220,48 +213,16 @@ EOS
     end
 
     def update_gemfile!
-      gemfile = File.join(rails_root, 'Gemfile')
-      gemfile_contents = File.read(gemfile)
+      gemfile = ::OopRailsServer::Gemfile.new(File.join(rails_root, 'Gemfile'))
 
-      # Since Rails 3.0.20 was released, a new version of the I18n gem, 0.5.2, was released that moves a constant
-      # into a different namespace. (See https://github.com/mislav/will_paginate/issues/347 for more details.)
-      # So, if we're running Rails 3.0.x, we lock the 'i18n' gem to an earlier version.
-      if rails_version && rails_version =~ /^3\.0\./
-        gemfile_contents << "\ngem 'i18n', '= 0.5.0'\n"
-      elsif RUBY_VERSION =~ /^1\.8\./
-        # Since Rails 3.x was released, a new version of the I18n gem, 0.7.0, was released that is incompatible
-        # with Ruby 1.8.7. So, if we're running with Ruby 1.8.7, we lock the 'i18n' gem to an earlier version.
-        gemfile_contents << "\ngem 'i18n', '< 0.7.0'\n"
-      end
+      backcompat_bootstrap_gems!(gemfile)
 
-      # Since Rails 3.1.12 was released, a new version of the rack-cache gem, 1.3.0, was released that requires
-      # Ruby 2.0 or above. So, if we're running Rails 3.1.x or 3.2.x on Ruby 1.8.x, we lock the 'rack-cache' gem
-      # to an earlier version.
-      if rails_version && rails_version =~ /^3\.[12]\./ && RUBY_VERSION =~ /^1\./
-        gemfile_contents << "\ngem 'rack-cache', '< 1.3.0'\n"
-      end
+      backcompat_execjs!(gemfile)
+      backcompat_uglifier!(gemfile)
 
-      if RUBY_VERSION =~ /^1\.8\./
-        # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
-        # new-style hash syntax. As a result, we pin the version backwards in this one specific case.
-        gemfile_contents << "\ngem 'execjs', '~> 2.0.0'\n"
+      gemfile_modifier.call(gemfile)
 
-        # Rake 11 is incompatible with Ruby 1.8
-        gemfile_contents << "\ngem 'rake', '< 11.0.0'\n"
-
-        # Uglifier 3 is incompatible with Ruby 1.8
-        gemfile_contents.gsub!(/^(.*['"]uglifier['"].*)$/, "\\1, '< 3.0.0'")
-      end
-
-      if RUBY_VERSION =~ /^1\./
-        # mime-types 3.x depends on mime-types-data, which is incompatible with Ruby < 1.x
-        gemfile_contents << "\ngem 'mime-types', '< 3.0.0'\n"
-      end
-
-      gemfile_contents << additional_gemfile_lines.join("\n")
-      gemfile_contents << "\n"
-
-      File.open(gemfile, 'w') { |f| f << gemfile_contents }
+      gemfile.write!
     end
 
     def with_env(new_env)
@@ -561,6 +522,83 @@ and output:
       say "OK" if notice
 
       output
+    end
+
+
+    def is_ruby_18
+      !! (RUBY_VERSION =~ /^1\.8\./)
+    end
+
+    def is_ruby_1
+      !! (RUBY_VERSION =~ /^1\./)
+    end
+
+    def is_rails_30
+      rails_version && rails_version =~ /^3\.0\./
+    end
+
+    def is_rails_31
+      rails_version && rails_version =~ /^3\.1\./
+    end
+
+    def is_rails_32
+      rails_version && rails_version =~ /^3\.2\./
+    end
+
+    def backcompat_i18n!(gemfile)
+      if is_rails_30
+        # Since Rails 3.0.20 was released, a new version of the I18n gem, 0.5.2, was released that moves a constant
+        # into a different namespace. (See https://github.com/mislav/will_paginate/issues/347 for more details.)
+        # So, if we're running Rails 3.0.x, we lock the 'i18n' gem to an earlier version.
+        gemfile.add_version_constraints!('i18n', '= 0.5.0')
+      elsif is_ruby_18
+        # Since Rails 3.x was released, a new version of the I18n gem, 0.7.0, was released that is incompatible
+        # with Ruby 1.8.7. So, if we're running with Ruby 1.8.7, we lock the 'i18n' gem to an earlier version.
+        gemfile.add_version_constraints!('i18n', '< 0.7.0')
+      end
+    end
+
+    def backcompat_rake!(gemfile)
+      if is_ruby_18
+        # Rake 11 is incompatible with Ruby 1.8
+        gemfile.add_version_constraints!('rake', '< 11.0.0')
+      end
+    end
+
+    def backcompat_rack_cache!(gemfile)
+      if is_ruby_1 && (is_rails_31 || is_rails_32)
+        # Since Rails 3.1.12 was released, a new version of the rack-cache gem, 1.3.0, was released that requires
+        # Ruby 2.0 or above. So, if we're running Rails 3.1.x or 3.2.x on Ruby 1.x, we lock the 'rack-cache' gem
+        # to an earlier version.
+        gemfile.add_version_constraints!('rack-cache', '< 1.3.0')
+      end
+    end
+
+    def backcompat_mime_types!(gemfile)
+      if is_ruby_1
+        # mime-types 3.x depends on mime-types-data, which is not compatible with ruby < 2.x
+        gemfile.add_version_constraints!('mime-types', '< 3.0.0')
+      end
+    end
+
+    def backcompat_execjs!(gemfile)
+      if is_ruby_18
+        # Apparently execjs released a version 2.2.0 that will happily install on Ruby 1.8.7, but which contains some
+        # new-style hash syntax. As a result, we pin the version backwards in this one specific case.
+        gemfile.add_version_constraints!('execjs', '~> 2.0.0')
+      end
+    end
+
+    def backcompat_uglifier!(gemfile)
+      # Uglifier 3 is incompatible with Ruby 1.8
+      gemfile.add_version_constraints!('uglifier', '< 3.0.0')
+    end
+
+    def backcompat_bootstrap_gems!(gemfile)
+      backcompat_i18n!(gemfile)
+      backcompat_rake!(gemfile)
+      backcompat_rack_cache!(gemfile)
+      backcompat_mime_types!(gemfile)
     end
   end
 end
