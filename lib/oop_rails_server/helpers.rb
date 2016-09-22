@@ -58,6 +58,8 @@ module OopRailsServer
       expect(json['exception']).to be
       expect(json['exception']['class']).to eq(class_name.to_s)
       expect(json['exception']['message']).to match(message)
+
+      json
     end
 
     def rails_template_name

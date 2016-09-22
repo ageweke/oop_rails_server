@@ -5,11 +5,22 @@ class ApplicationController < ActionController::Base
 
   rescue_from Exception do |exception|
     render :json => {
-      :exception => {
-        :class => exception.class.name,
-        :message => exception.message,
-        :backtrace => exception.backtrace
-      }
+      :exception => exception_to_hash(exception)
     }
+  end
+
+  private
+  def exception_to_hash(exception)
+    out = {
+      :class => exception.class.name,
+      :message => exception.message,
+      :backtrace => exception.backtrace
+    }
+
+    if exception.cause && (! exception.cause.equal?(exception))
+      out[:cause] = exception_to_hash(exception.cause)
+    end
+
+    out
   end
 end

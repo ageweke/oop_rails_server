@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.20, 22 September 2016
+
+* If exceptions have a `cause`, nest that inside the JSON returned on error.
+
 ## 0.0.19, 20 September 2016
 
 * Significant internal refactor to how Gemfiles get modified that's much more reliable; changes
