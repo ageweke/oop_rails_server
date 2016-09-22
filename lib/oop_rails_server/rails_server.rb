@@ -94,11 +94,16 @@ module OopRailsServer
     end
 
     def get_response(path_or_uri, options = { })
-      options.assert_valid_keys(:ignore_status_code, :nil_on_not_found, :query, :no_layout)
+      options.assert_valid_keys(:ignore_status_code, :nil_on_not_found, :query, :no_layout, :accept_header)
 
       uri = uri_for(path_or_uri, options[:query])
-      # say "[fetch '#{uri}']"
-      data = Net::HTTP.get_response(uri)
+      data = nil
+      accept_header = options.fetch(:accept_header, 'text/html')
+      Net::HTTP.start(uri.host, uri.port) do |http|
+        request = Net::HTTP::Get.new(uri)
+        request['Accept'] = accept_header if accept_header
+        data = http.request(request)
+      end
 
       if (data.code.to_s != '200')
         if options[:ignore_status_code]
@@ -106,7 +111,7 @@ module OopRailsServer
         elsif options[:nil_on_not_found]
           data = nil
         else
-          raise "'#{uri}' returned #{data.code.inspect}, not 200; body was: #{data.body.strip}"
+          raise "'#{uri}' returned #{data.code.inspect}, not 200; body was: #{data.body.inspect}"
         end
       end
       data

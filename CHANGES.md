@@ -3,6 +3,7 @@
 ## 0.0.20, 22 September 2016
 
 * If exceptions have a `cause`, nest that inside the JSON returned on error.
+* Pass 'Accept: text/html' by default when fetching from a Rails server, unless specified otherwise.
 
 ## 0.0.19, 20 September 2016
 
