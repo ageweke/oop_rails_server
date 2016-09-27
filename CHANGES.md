@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.21, 27 September 2016
+
+* Fixed an issue that broke compatibility with older Ruby versions, since `Net::HTTP::Get.new` could not accept a
+  `URI` object back then.
+
 ## 0.0.20, 27 September 2016
 
 * If exceptions have a `cause`, nest that inside the JSON returned on error.

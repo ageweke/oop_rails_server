@@ -100,7 +100,7 @@ module OopRailsServer
       data = nil
       accept_header = options.fetch(:accept_header, 'text/html')
       Net::HTTP.start(uri.host, uri.port) do |http|
-        request = Net::HTTP::Get.new(uri)
+        request = Net::HTTP::Get.new(uri.to_s)
         request['Accept'] = accept_header if accept_header
         data = http.request(request)
       end
