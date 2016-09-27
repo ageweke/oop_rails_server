@@ -1,6 +1,6 @@
 # `oop_rails_server` Releases
 
-## 0.0.20, 22 September 2016
+## 0.0.20, 27 September 2016
 
 * If exceptions have a `cause`, nest that inside the JSON returned on error.
 * Pass 'Accept: text/html' by default when fetching from a Rails server, unless specified otherwise.
