@@ -17,7 +17,7 @@ class ApplicationController < ActionController::Base
       :backtrace => exception.backtrace
     }
 
-    if exception.cause && (! exception.cause.equal?(exception))
+    if exception.respond_to?(:cause) && exception.cause && (! exception.cause.equal?(exception))
       out[:cause] = exception_to_hash(exception.cause)
     end
 

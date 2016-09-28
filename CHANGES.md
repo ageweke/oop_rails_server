@@ -1,5 +1,10 @@
 # `oop_rails_server` Releases
 
+## 0.0.22, 27 September 2016
+
+* Fixed a bug caused by trying to call `Exception#cause` without checking if it exists; this doesn't exist in older
+  Ruby versions.
+
 ## 0.0.21, 27 September 2016
 
 * Fixed an issue that broke compatibility with older Ruby versions, since `Net::HTTP::Get.new` could not accept a
