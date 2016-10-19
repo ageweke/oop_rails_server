@@ -367,7 +367,7 @@ The last #{last_lines.length} lines of this log are:
       end
     end
 
-    SERVER_VERIFY_TIMEOUT = 10
+    SERVER_VERIFY_TIMEOUT = 30
 
     def verify_server!
       server_verify_url = "http://#{localhost_name}:#{port}/working/rails_is_working"

@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.24, 19 October 2016
+
+* Bump up server verification timeout; JRuby can be incredibly slow running Rails in development mode.
+
 ## 0.0.23, 18 October 2016
 
 * Allow for POSTs, not just GETs, on the server.
