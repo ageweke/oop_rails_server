@@ -70,6 +70,10 @@ module OopRailsServer
       stop_server! if server_pid
     end
 
+    def post(path_or_uri, options = { })
+      send_http_request(path_or_uri, options.merge(:http_method => :post))
+    end
+
     def get(path_or_uri, options = { })
       out = get_response(path_or_uri, options)
       out.body.strip if out
@@ -93,14 +97,23 @@ module OopRailsServer
       "127.0.0.1"
     end
 
-    def get_response(path_or_uri, options = { })
-      options.assert_valid_keys(:ignore_status_code, :nil_on_not_found, :query, :no_layout, :accept_header)
+    def send_http_request(path_or_uri, options = { })
+      options.assert_valid_keys(:ignore_status_code, :nil_on_not_found, :query, :no_layout, :accept_header, :http_method, :post_variables)
 
       uri = uri_for(path_or_uri, options[:query])
       data = nil
       accept_header = options.fetch(:accept_header, 'text/html')
+
+      http_method = options[:http_method] || :get
+
       Net::HTTP.start(uri.host, uri.port) do |http|
-        request = Net::HTTP::Get.new(uri.to_s)
+        klass = Net::HTTP.const_get(http_method.to_s.strip.camelize)
+        request = klass.new(uri.to_s)
+
+        if options[:post_variables]
+          request.set_form_data(options[:post_variables])
+        end
+
         request['Accept'] = accept_header if accept_header
         data = http.request(request)
       end
@@ -115,6 +128,10 @@ module OopRailsServer
         end
       end
       data
+    end
+
+    def get_response(path_or_uri, options = { })
+      send_http_request(path_or_uri, options.merge(:http_method => :get))
     end
 
     def run_command_in_rails_root!(command)
@@ -382,8 +399,8 @@ The last #{last_lines.length} lines of this log are:
         raise_startup_failed_error!(Time.now - start_time, "'#{server_verify_url}' returned: #{result.inspect}")
       end
       actual_version = $1
-      ruby_version = $2
-      ruby_engine = $3
+      ruby_version = $3
+      ruby_engine = $4
 
       if rails_version != :default && (actual_version != rails_version)
         raise "We seem to have spawned the wrong version of Rails; wanted: #{rails_version.inspect} but got: #{actual_version.inspect}"

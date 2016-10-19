@@ -1,5 +1,9 @@
 # `oop_rails_server` Releases
 
+## 0.0.23, 18 October 2016
+
+* Allow for POSTs, not just GETs, on the server.
+
 ## 0.0.22, 27 September 2016
 
 * Fixed a bug caused by trying to call `Exception#cause` without checking if it exists; this doesn't exist in older
